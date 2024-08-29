@@ -24,43 +24,8 @@ const Chat = () => {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
-  const secretKey = 'your-secret-key'; // Replace with a more secure key or implement key exchange
 
-  useEffect(() => { 
-    console.log("calling fetch");
-    fetchGroupData() 
-  }, [])
-  
-
-  const fetchGroupData = async () => {
-    console.log("fetch group called");
-
-    try {
-      const response = await axios.get(`${API_URL}/api/group/${groupid}`);
-      setGroupData(response.data);
-      const joinPayload = {
-        groupid, name,
-        groupName: response?.data?.name
-      }
-      console.log("emitting");
-
-      socket.emit('joinRoom', joinPayload);
-    } catch (error) {
-      console.error('Error fetching group:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const onReceiveMessage = (encryptedMessage) => {
-    const bytes = CryptoJS.AES.decrypt(encryptedMessage.message, secretKey);
-    const decryptedMessage = { ...encryptedMessage, message: bytes.toString(CryptoJS.enc.Utf8) };
-    setMessages((prevMessages) => [...prevMessages, decryptedMessage]);
-  }
-  const onJoinGroup = name => {
-    setMessages((prevMessages) => [...prevMessages, { message: '', type: 'join', name: name }]);
-  }
-
+  useEffect(() => { fetchGroupData() }, [])
   useEffect(() => {
     if (groupData !== null) {
       socket.removeAllListeners()
@@ -70,9 +35,55 @@ const Chat = () => {
     }
   }, [groupData]);
 
+  /**
+   * The function fetches group data from an API, sets the data, emits a socket event to join a room,
+   * and handles errors and loading state.
+   */
+  const fetchGroupData = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/group/${groupid}`);
+      setGroupData(response.data);
+      const joinPayload = {
+        groupid, name,
+        groupName: response?.data?.name
+      }
+
+      socket.emit('joinRoom', joinPayload);
+    } catch (error) {
+      console.error('Error fetching group:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * The function `onReceiveMessage` decrypts an encrypted message using a specified key and adds the
+   * decrypted message to the list of messages.
+   * @param encryptedMessage - The `encryptedMessage` parameter is an object that contains an encrypted
+   * message. It likely has a property named `message` that holds the encrypted message content.
+   */
+  const onReceiveMessage = (encryptedMessage) => {
+    const bytes = CryptoJS.AES.decrypt(encryptedMessage.message, groupData?.key);
+    const decryptedMessage = { ...encryptedMessage, message: bytes.toString(CryptoJS.enc.Utf8) };
+    setMessages((prevMessages) => [...prevMessages, decryptedMessage]);
+  }
+
+  /**
+   * The `onJoinGroup` function adds a new message of type 'join' with the given name to the existing
+   * messages array.
+   */
+  const onJoinGroup = name => {
+    setMessages((prevMessages) => [...prevMessages, { message: '', type: 'join', name: name }]);
+  }
+
+
+
+  /**
+   * The `sendMessage` function encrypts a message using AES and sends it via a socket connection.
+   */
   const sendMessage = () => {
     if (message) {
-      const encryptedMessage = CryptoJS.AES.encrypt(message, secretKey).toString();
+      const encryptedMessage = CryptoJS.AES.encrypt(message, groupData?.key).toString();
       socket.emit('message', { message: encryptedMessage, name, senderId, groupid, type: 'text' });
       setMessage('');
     }
@@ -86,7 +97,7 @@ const Chat = () => {
             <h3 className='py-4'>Welcome <i>{name}</i> to {groupData?.name}</h3>
             <Row>
               <Col>
-                <ListGroup variant="flush"  style={{ height: '80vh', overflowY: 'auto' }}>
+                <ListGroup variant="flush" style={{ height: '80vh', overflowY: 'auto' }}>
                   {messages.map((message, index) => (
                     <>
                       {message.type === 'text' && (<ListGroup.Item
