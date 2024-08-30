@@ -1,21 +1,23 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Button, Spinner } from 'react-bootstrap';
+import { Button, ListGroup, Spinner } from 'react-bootstrap';
 const API_URL = process.env.REACT_APP_API_URL
 
 
 export default function Home() {
 
-  const [healthLoading, sethealthLoading] = useState(true);
+  const [healthLoading, setHealthLoading] = useState(true);
   const [live, setLive] = useState(false)
   const [groupName, setGroupName] = useState('');
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
 
   useEffect(() => {
     checkServer()
+    fetcGroups()
   }, [])
 
   const checkServer = async () => {
@@ -25,8 +27,22 @@ export default function Home() {
     } catch (err) {
       setLive(false)
     } finally {
-      sethealthLoading(false);
+      setHealthLoading(false);
     }
+  }
+
+
+  const fetcGroups = async () => {
+    try {
+      const { data } = await axios.get(`${API_URL}/api/groups`);
+      setGroups(data);
+    } catch (err) {
+      setLive(false)
+    }
+  }
+
+  const navigateToGroup = groupData => {
+    navigate(`/chat/${groupData.groupid}`, { state: { group: groupData } });
   }
 
   const handleSubmit = async (e) => {
@@ -35,14 +51,14 @@ export default function Home() {
     try {
       const response = await axios.post(`${API_URL}/api/groups`, { name: groupName });
       // Redirect to the Result page with the group data
-      console.log(response.data);
-      const { id, name, key, groupid } = response.data
-      navigate(`/chat/${groupid}`, { state: { group: response.data } });
+      navigateToGroup(response.data);
+      // const { id, name, key, groupid } = response.data
+      // navigate(`/chat/${groupid}`, { state: { group: response.data } });
     } catch (error) {
       console.error('Error creating group:', error);
       // Handle error appropriately
     } finally {
-      sethealthLoading(false);
+      setHealthLoading(false);
     }
   };
 
@@ -86,6 +102,28 @@ export default function Home() {
                 )}
               </Button>
             </form>
+
+            {
+              groups.length > 0 && (
+                <div className="container mt-5">
+                  <h3>Chat Groups</h3>
+                  <ListGroup>
+                    {groups.map(item => (
+                      <ListGroup.Item key={item.id} className="d-flex justify-content-between align-items-center">
+                        {item.name}
+                        <Button variant="primary" onClick={() => navigateToGroup(item)}>
+                          Open
+                        </Button>
+                      </ListGroup.Item>
+                    ))}
+                  </ListGroup>
+                </div>
+              )
+            }
+
+            <div>
+
+            </div>
           </div>
         )
       }
